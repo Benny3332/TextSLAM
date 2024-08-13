@@ -1113,7 +1113,7 @@ void optimizer::PyrPoseOptim(frame &F, double *pose, vector<SceneObservation*> S
         // a)
         problem.AddParameterBlock(pose, 4, new ceres::QuaternionParameterization());
         problem.AddParameterBlock(pose+4, 3);
-        LossFunction* loss_function = new HuberLoss(sqrt(5.991));
+        LossFunction* loss_function = new HuberLoss(std::sqrt(5.991));
 
         // b) get observations
         vector<SceneFeature*> vObv;
@@ -1366,7 +1366,7 @@ void optimizer::PyrBA(double **pose, double **theta, double **rho, const vector<
         for(size_t iKF=0; iKF<vKFs.size(); iKF++){
             problem.AddParameterBlock(pose[iKF], 4, new ceres::QuaternionParameterization());
             problem.AddParameterBlock(pose[iKF]+4, 3);
-            LossFunction* loss_function = new HuberLoss(sqrt(5.991));
+            LossFunction* loss_function = new HuberLoss(std::sqrt(5.991));
 
             // frame observation
             vector<SceneFeature*> vSceneObv;
@@ -1721,7 +1721,7 @@ void optimizer::PyrGlobalBA(double **pose, double **theta, double **rho, const v
         {
             problem.AddParameterBlock(pose[iKF], 4, new ceres::QuaternionParameterization());
             problem.AddParameterBlock(pose[iKF]+4, 3);
-            LossFunction* loss_function = new HuberLoss(sqrt(5.991));
+            LossFunction* loss_function = new HuberLoss(std::sqrt(5.991));
 
             // get this KF observation
             vector<SceneFeature*> vSceneObv = vKFs[iKF]->vSceneObv2d[PyBegin];
@@ -1870,7 +1870,7 @@ void optimizer::PyrLandmarkers(double **pose, double **theta, double **rho, cons
 
     if(FLAG_SCENE)
     {
-        LossFunction* loss_function = new HuberLoss(sqrt(5.991));
+        LossFunction* loss_function = new HuberLoss(std::sqrt(5.991));
         for(size_t iKF=0; iKF<vKFs.size(); iKF++)
         {
             // get this KF observation

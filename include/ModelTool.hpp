@@ -16,7 +16,6 @@ If you use any code of this repo in your work, please cite our papers:
 #include <opencv2/core.hpp>
 #include <math.h>
 using namespace std;
-using namespace ceres;
 
 inline double GetQPerturb(const Eigen::Quaterniond &q, Eigen::Quaterniond &plus_delta_qx, Eigen::Quaterniond &plus_delta_qy, Eigen::Quaterniond &plus_delta_qz)
 {

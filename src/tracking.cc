@@ -62,15 +62,30 @@ tracking::tracking(Mat33& K, map* Map, loopClosing* LClosing, setting* Setting):
 }
 
 
+/**
+ * @brief 捕获单目图像
+ *
+ * 从给定的图像中捕获单目图像，并进行相关处理。
+ *
+ * @param im 输入图像
+ * @param ImgTimeStamp 图像时间戳
+ * @param CameraK 相机内参矩阵
+ * @param TextDece 文本检测结果
+ * @param TextMean 文本均值信息
+ *
+ * @return 返回操作结果，0表示成功
+ */
 int tracking::GrabImageMonocular(const cv::Mat &im, const double &ImgTimeStamp, const Mat33 &CameraK, const vector<vector<Vec2>> &TextDece, const vector<TextInfo> &TextMean)
 {
     // 1. param initial
     cv::Mat ImTrack, ImTrack1;
     im.copyTo(ImTrack);
+    // 这行代码是使用OpenCV库中的cvtColor函数来转换图像的颜色空间。
+    // 具体来说，它将名为ImTrack的图像从BGR（Blue, Green, Red）颜色空间转换到灰度（GRAY）颜色空间。
     if(Set->Flag_RGB==0)
-        cvtColor(ImTrack, ImTrack, CV_BGR2GRAY);
+        cvtColor(ImTrack, ImTrack, cv::COLOR_BGR2GRAY);
     else if(Set->Flag_RGB==1)
-        cvtColor(ImTrack, ImTrack, CV_RGB2GRAY);
+        cvtColor(ImTrack, ImTrack, cv::COLOR_BGR2GRAY);
 
     Width = ImTrack.cols;
     Height = ImTrack.rows;
@@ -83,6 +98,8 @@ int tracking::GrabImageMonocular(const cv::Mat &im, const double &ImgTimeStamp, 
     bool bVelocity;
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET){
         bVelocity = false;
+        //frame()带多个参数的构造函数，用于初始化一个帧对象，
+        //包括灰度图像、时间戳、相机内参、尺度级别、尺度因子、文本检测信息、文本均值信息、ORB特征提取器指针等。
         cfCurrentFrame = frame(ImTrack, ImgTimeStamp, CameraK, iPylevels, dPyScales, TextDece, TextMean, coORBextractorIni, bVelocity);
     }else{
         bVelocity = true;
@@ -201,6 +218,7 @@ void tracking::Initialization(bool &FLAG_HASRECORD)
 
             // initial param: sigma = 1.0; iteration = 200
             ciInitializer =  new initializer(cfCurrentFrame,1.0,200);
+            //vector<int> vIniMatches;
             fill(vIniMatches.begin(),vIniMatches.end(),-1);
             return;
         }

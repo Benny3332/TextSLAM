@@ -48,10 +48,10 @@ public:
             double v = _K(1,1) * p(1)/p(2) + _K(1,2);
 
             // 2. intensity
-            int uf = floor(u);
-            int vf = floor(v);
-            int uc = ceil(u);
-            int vc = ceil(v);
+            int uf = std::floor(u);
+            int vf = std::floor(v);
+            int uc = std::ceil(u);
+            int vc = std::ceil(v);
             if(uf<0 || vf<0 || uc>=_stride || vc>=_rows){
                 CurInten = 0;
             }else{

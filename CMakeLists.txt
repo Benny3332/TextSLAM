@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 11)
 # ceres
 find_package(Ceres REQUIRED)
 # opencv
-#set(OpenCV_DIR /opt/ros/kinetic/share/OpenCV-3.3.1-dev)
+set(OpenCV_DIR /opt/ros/kinetic/share/OpenCV-3.3.1-dev)
 find_package(OpenCV REQUIRED)
 # Sophus
 find_package(Sophus REQUIRED)
