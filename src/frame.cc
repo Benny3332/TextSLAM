@@ -51,13 +51,18 @@ namespace TextSLAM
         // 2. pyramid basic info
         if (!GetPyrParam())
             throw runtime_error("Pyramid param input error.");
+        //创建多尺度的图像金字塔
         GetPyrMat();
         // 3. frame basic info, and text detection info
+        // 初始化当前帧相机参数，以及当前帧的文本检测结果（中心点list、单个文本xy坐标最大最小值）
         GetFrameParam();
 
         // 4. feature extractor
+        //KLT特征点提取，文本框内的
         FeatExtract();
+        //将场景（Scene）特征点和文本（Text）特征点进行融合
         FeatFusion();
+        //文本特征的金字塔表示
         TextFeaProc();
 
         AssignFeaturesToGrid();
@@ -136,7 +141,7 @@ namespace TextSLAM
                 invfx << ", " << invfy << endl;
             cout << "mnMinX, mnMaxX, mnMinY, mnMaxY are: " << mnMinX << ", " << mnMaxX << ", " << mnMinY << ", " <<
                 mnMaxY << endl;
-            cout << "mfGridElementWidthInv and mfGridElementHeightInv are: " << mfGridElementHeightInv << ", " <<
+            cout << "mfGridElementWidthInv and mfGridElementHeightInv are: " << mfGridElementWidthInv << ", " <<
                 mfGridElementHeightInv << endl;
         }
 
@@ -244,6 +249,7 @@ namespace TextSLAM
         // 2. scene feature extraction
         vector<cv::KeyPoint> KeysSceneRaw;
         cv::Mat DescripSceneRaw;
+        // ORB特征检测器从图像中提取特征点和描述符
         FeatExtraScene(ImgScene, KeysSceneRaw, DescripSceneRaw);
 
         // 3. text feature extraction
@@ -264,6 +270,7 @@ namespace TextSLAM
         }
         else if (FLAG_FEAPROC && FLAG_NOSCENEMASK)
         {
+            // 论文中的IV A 中的用KLT 提取FAST点，255行已经提取图像所以特征点，这里是过滤掉文本框外的特征点
             Tool.BoundFeatDele_T(FrameImg, KeysTextRaw, DescripTextRaw, vTextDete, vTextDeteMin, vTextDeteMax, WinText,
                                  vKeysText, mDescrText, IdxNewText);
             vKeysScene = KeysSceneRaw;
@@ -277,7 +284,14 @@ namespace TextSLAM
             mDescrText = DescripTextRaw;
         }
     }
-
+    //将场景（Scene）特征点和文本（Text）特征点进行融合，并将它们的描述符（Descriptors）
+    //合并成一个统一的描述符矩阵。这个过程涉及到几个关键的步骤，包括判断是否有场景特征点、
+    //将文本特征点信息加入到描述符中、以及最后构建融合后的特征点和描述符索引。
+    /**
+    * 将场景（Scene）特征点和文本（Text）特征点进行融合，并将它们的描述符（Descriptors）
+    * 合并成一个统一的描述符矩阵。这个过程涉及到几个关键的步骤，包括判断是否有场景特征点、
+    * 将文本特征点信息加入到描述符中、以及最后构建融合后的特征点和描述符索引。
+    */
     void frame::FeatFusion()
     {
         iNScene = vKeysScene.size();
@@ -396,6 +410,10 @@ namespace TextSLAM
 
 
     // for each text object in the frame, get its pyramid
+    /**
+     * 对每个文本对象（由vKeysText中的元素表示）进行进一步的处理，
+     * 以构建一个文本特征的金字塔表示，并将这些特征存储在vfeatureText中
+     */
     void frame::TextFeaProc()
     {
         for (size_t i0 = 0; i0 < iNTextObj; i0++)
