@@ -208,7 +208,8 @@ void tracking::Track()
 
 void tracking::Initialization(bool &FLAG_HASRECORD)
 {
-
+    //1.找到特征点大于100的帧
+    //2.再找到下一个与当前帧特征点匹配大于100的帧
     if(!ciInitializer){
         // A) find 1st initial frame
         if(cfCurrentFrame.iNScene>100 ){
@@ -237,6 +238,8 @@ void tracking::Initialization(bool &FLAG_HASRECORD)
         // B.2) find 2D matches
         int Win = (int)100;
         vector<int> vIniMatchesTest;
+        //给定两帧（F1和F2）之间搜索并匹配特征点，特别是初始化阶段可能需要的匹配。
+        //这个函数通过比较特征描述符（descriptors）来找到两帧之间相似的特征点，并返回成功匹配的特征点对数。
         int nMatches = SearchForInitializ(cfInitialFrame, cfCurrentFrame, Win, vIniMatches);
 
         if(nMatches<100){
@@ -246,12 +249,15 @@ void tracking::Initialization(bool &FLAG_HASRECORD)
         }
 
         // B.3) calculate relative pose and landmarker position
+        // 旋转矩阵和平移向量
         cv::Mat Rcw;
         cv::Mat tcw;
+
         vector<bool> vbTriangulated;
         vector<cv::Point3f> IniP3D;
-
+        // if()内为初始化，并把特征点三角化，并且计算两帧之间的相对位姿
         if(ciInitializer->Initialize(cfCurrentFrame, vIniMatches, Rcw, tcw, IniP3D, vbTriangulated)){
+
             for(size_t i0 = 0; i0<vIniMatches.size(); i0++){
                 if(vIniMatches[i0]>=0 && !vbTriangulated[i0]){
                     vIniMatches[i0] = -1;
@@ -261,6 +267,8 @@ void tracking::Initialization(bool &FLAG_HASRECORD)
 
 
             // B.4) initial param setting
+            //将一个OpenCV中的旋转矩阵和平移向量转换为一个4x4的齐次变换矩阵（TCW），
+            //这个矩阵可以表示当前帧与上一帧的相机位姿变换。
             Mat44 Tcw;
             Tcw.setIdentity();
             cfInitialFrame.SetPose(Tcw);

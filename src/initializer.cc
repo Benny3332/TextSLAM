@@ -32,6 +32,7 @@ initializer::initializer(const frame &RefFrame, float sigma, int iterations)
     mMaxIterations = iterations;
 }
 
+    //标记哪些点被成功三角化
 bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21,
                              vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
 {
@@ -39,6 +40,12 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
     // Reference Frame: 1, Current Frame: 2
     mvKeys2 = CurrentFrame.vKeys;
 
+    /*
+    vector<cv::KeyPoint> mvKeys1;
+    vector<cv::KeyPoint> mvKeys2;
+    vector<Match> mvMatches12;
+    vector<bool> mvbMatched1;
+    */
     mvMatches12.clear();
     mvMatches12.reserve(mvKeys2.size());
     mvbMatched1.resize(mvKeys1.size());
@@ -58,6 +65,7 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
     // Indices for minimum set selection
     vector<size_t> vAllIndices;
     vAllIndices.reserve(N);
+    //无符号整数类型
     vector<size_t> vAvailableIndices;
 
     for(int i=0; i<N; i++)
@@ -69,7 +77,9 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
     mvSets = vector< vector<size_t> >(mMaxIterations,vector<size_t>(8,0));
 
     DUtils::Random::SeedRandOnce(0);
-
+    // RANSAC（Random Sample Consensus，随机抽样一致性算法）
+    // 这也没用上啊？
+    // todo 这注释了运行报错
     for(int it=0; it<mMaxIterations; it++)
     {
         vAvailableIndices = vAllIndices;
@@ -636,28 +646,35 @@ bool initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
 bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv::Mat &K,
                       cv::Mat &R21, cv::Mat &t21, vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated, float minParallax, int minTriangulated)
 {
+    // 计算内点匹配的数量
     int N=0;
     for(size_t i=0, iend = vbMatchesInliers.size() ; i<iend; i++)
         if(vbMatchesInliers[i])
             N++;
 
-    // We recover 8 motion hypotheses using the method of Faugeras et al.
-    // Motion and structure from motion in a piecewise planar environment.
-    // International Journal of Pattern Recognition and Artificial Intelligence, 1988
+    // 使用Faugeras等人提出的方法恢复8个运动假设
+    // 运动和结构从运动在一个分段平面环境中恢复
+    // 国际模式识别与人工智能杂志，1988年
 
+    // 计算K的逆矩阵
     cv::Mat invK = K.inv();
+    // 计算A矩阵
     cv::Mat A = invK*H21*K;
 
+    // 对A进行SVD分解
     cv::Mat U,w,Vt,V;
     cv::SVD::compute(A,w,U,Vt,cv::SVD::FULL_UV);
     V=Vt.t();
 
+    // 计算行列式
     float s = cv::determinant(U)*cv::determinant(Vt);
 
+    // 获取SVD分解的奇异值
     float d1 = w.at<float>(0);
     float d2 = w.at<float>(1);
     float d3 = w.at<float>(2);
 
+    // 检查奇异值的条件
     if(d1/d2<1.00001 || d2/d3<1.00001)
     {
         bool c0 = d1/d2<1.00001;
@@ -665,23 +682,24 @@ bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         return false;
     }
 
+    // 预留存储空间
     vector<cv::Mat> vR, vt, vn;
     vR.reserve(8);
     vt.reserve(8);
     vn.reserve(8);
 
-    //n'=[x1 0 x3] 4 posibilities e1=e3=1, e1=1 e3=-1, e1=-1 e3=1, e1=e3=-1
+    // 计算n'=[x1 0 x3]的四种可能性
     float aux1 = sqrt((d1*d1-d2*d2)/(d1*d1-d3*d3));
     float aux3 = sqrt((d2*d2-d3*d3)/(d1*d1-d3*d3));
     float x1[] = {aux1,aux1,-aux1,-aux1};
     float x3[] = {aux3,-aux3,aux3,-aux3};
 
-    //case d'=d2
+    // 当d'=d2时的情况
     float aux_stheta = sqrt((d1*d1-d2*d2)*(d2*d2-d3*d3))/((d1+d3)*d2);
-
     float ctheta = (d2*d2+d1*d3)/((d1+d3)*d2);
     float stheta[] = {aux_stheta, -aux_stheta, -aux_stheta, aux_stheta};
 
+    // 构建旋转矩阵和翻译向量
     for(int i=0; i<4; i++)
     {
         cv::Mat Rp=cv::Mat::eye(3,3,CV_32F);
@@ -713,9 +731,8 @@ bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         vn.push_back(n);
     }
 
-    //case d'=-d2
+    // 当d'=-d2时的情况
     float aux_sphi = sqrt((d1*d1-d2*d2)*(d2*d2-d3*d3))/((d1-d3)*d2);
-
     float cphi = (d1*d3-d2*d2)/((d1-d3)*d2);
     float sphi[] = {aux_sphi, -aux_sphi, -aux_sphi, aux_sphi};
 
@@ -751,7 +768,7 @@ bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         vn.push_back(n);
     }
 
-
+    // 选择最佳解
     int bestGood = 0;
     int secondBestGood = 0;
     int bestSolutionIdx = -1;
@@ -759,8 +776,8 @@ bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
     vector<cv::Point3f> bestP3D;
     vector<bool> bestTriangulated;
 
-    // Instead of applying the visibility constraints proposed in the Faugeras' paper (which could fail for points seen with low parallax)
-    // We reconstruct all hypotheses and check in terms of triangulated points and parallax
+    // 不使用Faugeras论文中提出的可见性约束（在低视差下可能会失败）
+    // 而是重构所有假设并根据三角化点数和视差进行检查
     for(size_t i=0; i<8; i++)
     {
         float parallaxi;
@@ -783,7 +800,7 @@ bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         }
     }
 
-
+    // 检查最佳解是否满足条件
     if(secondBestGood<0.75*bestGood && bestParallax>=minParallax && bestGood>minTriangulated && bestGood>0.9*N)
     {
         vR[bestSolutionIdx].copyTo(R21);
