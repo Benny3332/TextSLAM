@@ -78,8 +78,6 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
 
     DUtils::Random::SeedRandOnce(0);
     // RANSAC（Random Sample Consensus，随机抽样一致性算法）
-    // 这也没用上啊？
-    // todo 这注释了运行报错
     for(int it=0; it<mMaxIterations; it++)
     {
         vAvailableIndices = vAllIndices;
@@ -89,7 +87,7 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
         {
             int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
             int idx = vAvailableIndices[randi];
-
+            //这用上了
             mvSets[it][j] = idx;
 
             vAvailableIndices[randi] = vAvailableIndices.back();
@@ -109,6 +107,9 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
     float RH = SH/(SH+SF);
 
     // Try to reconstruct from homography or fundamental depending on the ratio
+    //如果最佳解的质量足够高（即与其他解相比有足够多的优势、视差足够大、三角化点数足够多、内点占比足够高），
+    //则将最佳解复制到输出参数，并返回true。
+    //todo
     if(RH>0.40)
         return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
     else
@@ -783,6 +784,13 @@ bool initializer::ReconstructH(vector<bool> &vbMatchesInliers, cv::Mat &H21, cv:
         float parallaxi;
         vector<cv::Point3f> vP3Di;
         vector<bool> vbTriangulatedi;
+        /*
+            调用CheckRT函数来评估当前候选位姿（vR[i]和vt[i]）。
+            该函数接受多个参数，包括两个关键帧中的关键点（mvKeys1和mvKeys2）、匹配（mvMatches12）、内点标记（vbMatchesInliers）
+            、相机内参（K），以及用于三角测量的参数（如重投影误差阈值4.0*mSigma2）。
+            CheckRT函数执行三角测量，并返回成功三角化的点数（nGood），同时更新vP3Di和vbTriangulatedi以反映当前候选位姿下的结果，
+            并计算或更新parallaxi。
+        */
         int nGood = CheckRT(vR[i],vt[i],mvKeys1,mvKeys2,mvMatches12,vbMatchesInliers,K,vP3Di, 4.0*mSigma2, vbTriangulatedi, parallaxi);
 
         if(nGood>bestGood)
@@ -913,7 +921,8 @@ int initializer::CheckRT(const cv::Mat &R, const cv::Mat &t, const vector<cv::Ke
     cv::Mat O2 = -R.t()*t;
 
     int nGood=0;
-
+    //检查vMatches12中每一对匹配点（pair<int.int>,即vKeys1，vKeys2中的点），并将该点三角坐标化
+    //三角化后再检查视差、深度验证、重投影误差检查，都通过则将该点加入vbGood中，并记录视差、深度信息
     for(size_t i=0, iend=vMatches12.size();i<iend;i++)
     {
         if(!vbMatchesInliers[i])

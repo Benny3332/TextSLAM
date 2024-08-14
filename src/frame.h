@@ -86,6 +86,7 @@ public:
 
     // 3. pose info
     Mat44 mTcw, mTwc;
+    // 旋转矩阵 c:相机的坐标系，w:世界坐标系
     Mat33 mRcw, mRwc;
     Mat31 mtcw, mtwc;
     // vNGOOD=true if there are enough features (>=thresh(3...)).

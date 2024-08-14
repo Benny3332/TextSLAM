@@ -592,6 +592,7 @@ namespace TextSLAM
     void frame::UpdatePoseMatrices()
     {
         mRcw = mTcw.block<3, 3>(0, 0);
+        // 转置，得到逆矩阵
         mRwc = mRcw.transpose();
         mtcw = mTcw.block<3, 1>(0, 3);
         mtwc = -mRwc * mtcw;

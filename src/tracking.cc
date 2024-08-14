@@ -129,14 +129,21 @@ void tracking::Track()
     // 2. main proc
     if(mState==NOT_INITIALIZED){
         // A) No initialized -> INITIALIZE
+        /**
+         * 这里为找到两个可用帧（特征点多，匹配的点也多，同时视差较大，能得出准确相机位姿变化的帧）
+         *
+         */
         Initialization(FLAG_HASRECORD);
 
         if(mState!=OK)
             return;
+        else
+            cout << "can use frame time stamp:" << cfLastFrame.dTimeStamp << endl;
     }else{
         // B.1) Has initialized -> GENERAL TRACKING
         bool FLAG_OK;
         if(cfLastFrame.bVelocity){
+            //todo
             FLAG_OK = TrackWithMotMod();
         }else{
             FLAG_OK = TrackWithOutMod();
@@ -171,6 +178,7 @@ void tracking::Track()
         if(CheckNewKeyFrame()){
 
             std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+            //todo
             TrackNewKeyframe();
             std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
             double tNewKF= std::chrono::duration_cast<std::chrono::duration<double> >(t1 - t0).count();
@@ -255,7 +263,7 @@ void tracking::Initialization(bool &FLAG_HASRECORD)
 
         vector<bool> vbTriangulated;
         vector<cv::Point3f> IniP3D;
-        // if()内为初始化，并把特征点三角化，并且计算两帧之间的相对位姿
+        // if()内为初始化，计算两帧之间的相对位姿，并把特征点三角化
         if(ciInitializer->Initialize(cfCurrentFrame, vIniMatches, Rcw, tcw, IniP3D, vbTriangulated)){
 
             for(size_t i0 = 0; i0<vIniMatches.size(); i0++){
@@ -276,6 +284,7 @@ void tracking::Initialization(bool &FLAG_HASRECORD)
             cfCurrentFrame.SetPose(Tcw);
 
             // B.5) establish initial map and global BA
+            // 将当前帧的相机位姿，特征点3d参数加入到map中
             CreatInitialMap(IniP3D, ciInitializer);
 
             // B.6) record
@@ -302,55 +311,79 @@ void tracking::InitialLandmarker(const vector<cv::Point3f> &IniP3D, initializer*
     // 1. get scene 3D invers depth define & its observation
     F1->vMatches2D3D = vector<int>(F1->iN, (int)-1);
     F2->vMatches2D3D = vector<int>(F2->iN, (int)-1);
-
+    // 储存每个单词框中的特征点索引
     vector<vector<int>> KeysTextIdx;
     KeysTextIdx.resize(F1->iNTextObj);
     int iText = 0;
     for(size_t i0 = 0; i0<vIniMatches.size(); i0++){
+        // 如果匹配点无效，则跳过
         if(vIniMatches[i0]<0)
             continue;
 
+        // 如果匹配点属于文本对象
         if(F1->vTextObjInfo[i0]>=0){
             int IdxTextObj = F1->vTextObjInfo[i0];
+            // 将匹配点索引添加到文本对象的索引列表中
             KeysTextIdx[IdxTextObj].push_back(i0);
             iText++;
             continue;
         }
 
+        // 获取两个关键帧中的匹配点索引
         int idx1 = i0;
         int idx2 = vIniMatches[i0];
+
+        // 计算空间点的逆深度表示
+        // Eigen::Matrix<double,3,1> Vec3;
         Vec3 pt;
         pt(0) = ((double)F1->vKeys[idx1].pt.x-F1->cx)/F1->fx;
         pt(1) = ((double)F1->vKeys[idx1].pt.y-F1->cy)/F1->fy;
+        //x,y表示为相机坐标系下的归一化坐标，正常情况下z为1，但这里为了方便计算，将其设置为逆深度
         pt(2) = (double)1.0/(double)IniP3D[i0].z;
 
+        // 获取两个关键帧中的观测点坐标
+        // typedef Eigen::Matrix<double,2,1> Vec2;
         Vec2 ptObv1, ptObv2;
         ptObv1(0) = F1->vKeys[idx1].pt.x;
         ptObv1(1) = F1->vKeys[idx1].pt.y;
         ptObv2(0) = F2->vKeys[idx2].pt.x;
         ptObv2(1) = F2->vKeys[idx2].pt.y;
 
+        // 将空间点和观测点添加到关键帧的列表中
         F1->IniScenePts3d.push_back(pt);
         F1->IniSceneObv2d.push_back(ptObv1);
         F2->IniSceneObv2d.push_back(ptObv2);
-        // F1.IniScenePts3d is corresponding to F2.IniSceneObv2d
+        // F1中的IniScenePts3d与F2中的IniSceneObv2d是对应的
 
+        // 初始化场景点
         // scene pts init
         mapPts* scenepts = new mapPts(pt, F1);
+
+        // 将关键帧添加到场景点的观测列表中
         // b) mapText add kf
         scenepts->AddObserv(F1, idx1);
         scenepts->AddObserv(F2, idx2);
+
+        // 将场景点添加到关键帧的观测列表中
         // c) kf add mapText observation
         F1->AddSceneObservForInitial(scenepts, idx1);
         F2->AddSceneObservForInitial(scenepts, idx2);
+
+        // 更新关键帧的匹配索引
         F1->vMatches2D3D[idx1] = scenepts->mnId;
         F2->vMatches2D3D[idx2] = scenepts->mnId;
+
+        // 将场景点添加到地图中
         // d) map add map pts
         mpMap->Addscenepts(scenepts);
+
+        // 更新地图中与关键帧相关的协方差信息
         mpMap->UpdateCovMap_1(F1, scenepts);
         mpMap->UpdateCovMap_1(F2, scenepts);
 
     }
+
+
     Eigen::MatrixXd M1All = mpMap->GetCovMap_1();
     GetCovisibleKFs_all(F1, mpMap->imapkfs);
     GetCovisibleKFs_all(F2, mpMap->imapkfs);
@@ -1044,6 +1077,7 @@ void tracking::CreatInitialMap(vector<cv::Point3f> &IniP3D, initializer* Initial
     InitialLandmarker(IniP3D, Initializ, pKFini, pKFcur);
 
     // initial global BA
+    //全局光束平差法（Bundle Adjustment, BA）
     coOptimizer->InitBA(pKFini, pKFcur);
 
     cfCurrentFrame.SetPose(pKFcur->mTcw);

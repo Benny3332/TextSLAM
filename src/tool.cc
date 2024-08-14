@@ -1224,7 +1224,8 @@ bool tool::CalTextinfo(const cv::Mat &Img, const vector<Vec2> &vTextDete, double
     const cv::Point* ptMask[1] = {TextObjBox};
     int npt[] = {4};
     cv::fillPoly(TemplateImg, ptMask, npt, 1, cv::Scalar(-1,-1,-1));
-
+    cv::imshow("TemplateImg", TemplateImg);
+    cv::waitKey(0);
     vector<double> TextObjInten;
     for(size_t iRow = yMin; iRow<=yMax; iRow++){
         for(size_t iCol = xMin; iCol<=xMax; iCol++){
