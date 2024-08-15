@@ -32,9 +32,19 @@ initializer::initializer(const frame &RefFrame, float sigma, int iterations)
     mMaxIterations = iterations;
 }
 
-    //标记哪些点被成功三角化
-bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21,
-                             vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
+    //标记哪些点被成功三角化 IniP3D
+    /**
+     *  Initialize(cfCurrentFrame, vIniMatches, Rcw, tcw, IniP3D, vbTriangulated)
+     * @param CurrentFrame
+     * @param vMatches12
+     * @param R21 Rcw
+     * @param t21 tcw
+     * @param vP3D IniP3D
+     * @param vbTriangulated 标记那些特征点被三角化
+     * @return
+     */
+    bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21,
+                                 vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
 {
     // Fill structures with current keypoints and matches with reference frame
     // Reference Frame: 1, Current Frame: 2
@@ -99,7 +109,7 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
     vector<bool> vbMatchesInliersH, vbMatchesInliersF;
     float SH, SF;
     cv::Mat H, F;
-
+    //todo
     FindHomography(vbMatchesInliersH, SH, H);
     FindFundamental(vbMatchesInliersF, SF, F);
 
@@ -109,6 +119,7 @@ bool initializer::Initialize(const frame &CurrentFrame, const vector<int> &vMatc
     // Try to reconstruct from homography or fundamental depending on the ratio
     //如果最佳解的质量足够高（即与其他解相比有足够多的优势、视差足够大、三角化点数足够多、内点占比足够高），
     //则将最佳解复制到输出参数，并返回true。
+    //R21 Rcw t21 tcw vP3D IniP3D vbTriangulated 标记那些特征点被三角化
     //todo
     if(RH>0.40)
         return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);

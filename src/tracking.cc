@@ -134,12 +134,13 @@ void tracking::Track()
         /**
          * 这里为找到两个可用帧（特征点多，匹配的点也多，同时视差较大，能得出准确相机位姿变化的帧）
          *      1.找到特征点大于100的帧
-         *      2.再找到下一个与当前帧特征点匹配大于100的帧
+         *      2.再找到下一个与当前帧特征点匹配大于100 的帧
          *          2.1 通过SearchForInitializ将两帧之间特征点匹配，用vIniMatches保存匹配点
          *          2.2 计算两帧之间的相对位姿，并把特征点三角化
          *          2.3 用cTcw 保存当前帧与上一帧的相机位姿变换
          *          2.4 将当前帧的相机位姿，特征点3d参数加入到map中 tracking::map* mpMap;
          *          2.5 计算Text强度、方差、BA乱七八糟的，然后筛选再加入map
+         *          ps：（待确认）第一帧的位姿是单位矩阵，但是这里不止进来一次，这样map中有多个点位姿是单位矩阵？
          */
         Initialization(FLAG_HASRECORD);
 
@@ -1141,7 +1142,6 @@ int tracking::SearchForInitializ(const frame &F1, const frame &F2, const int &Wi
         int bestDist = INT_MAX;
         int bestDist2 = INT_MAX;
         int bestIdx2 = -1;
-
         for(vector<size_t>::iterator vit=vF2Candidate.begin(); vit!=vF2Candidate.end(); vit++){
             size_t i2 = *vit;
             cv::Mat d2 = F2.mDescr.row(i2);
