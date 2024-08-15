@@ -151,10 +151,25 @@ void tracking::Track()
     }else{
         // B.1) Has initialized -> GENERAL TRACKING
         bool FLAG_OK;
+        //TrackWithMotMod：使用 mVelocity * cfLastFrame.mTcw 来设置当前帧的位姿。
+        //    这里，mVelocity 可能表示某种形式的运动模型或速度估计，用于预测当前帧的位姿。
+        //TrackWithOutMod：直接使用 cfLastFrame.mTcw 作为当前帧的位姿，没有应用任何运动模型或速度估计。
         if(cfLastFrame.bVelocity){
             //todo
             FLAG_OK = TrackWithMotMod();
         }else{
+            /**
+             *  1.
+             *      1.1 匹配地图点与当前帧的2D关键点
+             *      1.2 获取场景点观测及其特征
+             *  2. 获取场景点观测及其特征
+             *  3. 跟踪地图文本对象
+             *  4. 位姿优化
+             *      4.1 得到邻近关键帧中保存的所有文本参数（特征点及描述符）
+             *      4.2 使用金字塔法进行匹配
+             *  5. 更新文本对象和跟踪潜在新文本对象
+             *      5.1 在TrackNewTextFeat()使用KLT追踪新文本并保存在cfCurrentFrame.vKeysTextTrack中
+             */
             FLAG_OK = TrackWithOutMod();
         }
 
@@ -182,8 +197,10 @@ void tracking::Track()
         if(FLAG_OK){
             mVelocity = cfCurrentFrame.mTcw * cfLastFrame.mTwc;
         }
-
-        // B.2) keyframe and local BA
+        //c1：如果当前帧的ID大于上一个关键帧的ID加上某个最大帧数阈值mMaxFrames(帧率的一半)，则认为应该创建新关键帧。
+        //c2：如果当前帧与邻居关键帧之间的匹配点数（iMatches）小于邻居关键帧中被跟踪地图点数乘以参考比例阈值，并且匹配点数大于15，则认为应该创建新关键帧。 这表示当前帧与最近的关键帧在视觉上发生了较大的变化
+        //c3：如果当前帧的ID大于上一个关键帧的ID加上另一个更大的最大帧数阈值mMaxFramesMax，则无条件认为应该创建新关键帧。
+            // B.2) keyframe and local BA
         if(CheckNewKeyFrame()){
 
             std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
@@ -548,10 +565,14 @@ bool tracking::TrackWithOutMod()
     // 1.1 match map points with current frame 2D keypoints
     vector<int> vMatch3D2D, vMatch2D3D;
     vector<mapPts*> vAllMappts = mpMap->GetAllMapPoints();
+    //遍历关键帧（vKeyframes）, 获取最近关键帧和次近关键帧
     vector<keyframe*> neighKFs = mpMap->GetNeighborKF(cfCurrentFrame);
     int th = 15;
+
+    //将地图保存的所有特征点投影到当前帧，并根据描述符找到该特征点在当前帧中的匹配点
     int nMatchS1 = SearchFrom3D(vAllMappts, cfCurrentFrame, vMatch3D2D, vMatch2D3D, th, neighKFs[0]);      // search with the nearest keyframe, Match info initial here
     int nMatchS2 = SearchFrom3DAdd(vAllMappts, cfCurrentFrame, vMatch3D2D, vMatch2D3D, th, neighKFs[1]);   // search with the keyframe before the nearest keyframe
+
     float PnPth=4.0;
     int Snmatches = nMatchS1 + nMatchS2;
     if(Snmatches>20)
@@ -1179,6 +1200,7 @@ int tracking::SearchForInitializ(const frame &F1, const frame &F2, const int &Wi
 // input: vector<mapPts*> Mappts: all map points to project; frame &F: the frame to find corresponding features; int th: search window around projection; int flag use which keyframe: 0->the nearest keyframe, 1->the keyframe before the nearest keyframe
 // output: vector<int> match3D2D&match2D3D: match based on 3Dto2D & 2Dto3D
 // return: all match number
+//  SearchFrom3D(vAllMappts, cfCurrentFrame, vMatch3D2D, vMatch2D3D, th, neighKFs[0]);
 int tracking::SearchFrom3D(const vector<mapPts*> Pts3d, const frame &F, vector<int> &vMatch3D2D, vector<int> &vMatch2D3D, const int &th, keyframe* F1)
 {
     vector<int> vMatch12;
@@ -1198,7 +1220,7 @@ int tracking::SearchFrom3D(const vector<mapPts*> Pts3d, const frame &F, vector<i
         int IdxObserv;
         if(!pt->GetKFObv(F1, IdxObserv))
             continue;
-
+        //将特征点（3d）投影到当前帧图像上
         keyframe* RefKF = pt->RefKF;
         Mat44 Trw = RefKF->mTcw;
         Mat44 Tcr = Tcw*Trw.inverse();
@@ -1222,6 +1244,7 @@ int tracking::SearchFrom3D(const vector<mapPts*> Pts3d, const frame &F, vector<i
         vector<size_t> vIndices2;
         int LastKFOctave = 0;
         float radius = th*1.2f;
+        //找到此特征点再图像一邻近区域内的所有特征点
         vIndices2 = F.GetFeaturesInArea(u,v, radius, LastKFOctave-1, LastKFOctave+1);
 
         if(vIndices2.empty())
@@ -1230,6 +1253,7 @@ int tracking::SearchFrom3D(const vector<mapPts*> Pts3d, const frame &F, vector<i
         cv::Mat dMP = F1->mDescr.row(IdxObserv);
         int bestDist = INT_MAX;
         int bestIdx2 = -1;
+        //根据描述符匹配点
         for(vector<size_t>::const_iterator vit=vIndices2.begin(), vend=vIndices2.end(); vit!=vend; vit++){
             const size_t i2 = *vit;
 

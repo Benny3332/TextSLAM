@@ -175,6 +175,7 @@ void optimizer::PoseOptim(frame &F)
     cv::Mat ImgTextLabel;       // use the optimized parameters project all map text into the current frame. the label is idx of TextObjs.
 
     // setting
+    std::chrono::steady_clock::time_point t2_T = std::chrono::steady_clock::now();
     double chi2Mono[4]={12.25,12.25,12.25,12.25};
     double chi2Text[4]={0.5,0.5,0.5,0.95};
     const int its[4]={10,10,10,10};
@@ -184,7 +185,9 @@ void optimizer::PoseOptim(frame &F)
     PyrPoseOptim(F, pose, ScenePts, SceneObv, TextObjs, PyBegin1, chi2Mono[1], chi2Text[1], its[1], vPtsGood, vTextsGood, vTextFeatsGood, FLAGTextObjs, ImgTextLabel);
     PyrPoseOptim(F, pose, ScenePts, SceneObv, TextObjs, PyBegin2, chi2Mono[2], chi2Text[2], its[2], vPtsGood, vTextsGood, vTextFeatsGood, FLAGTextObjs, ImgTextLabel);
     PyrPoseOptim(F, pose, ScenePts, SceneObv, TextObjs, PyBegin3, chi2Mono[3], chi2Text[3], its[3], vPtsGood, vTextsGood, vTextFeatsGood, FLAGTextObjs, ImgTextLabel);
-
+    std::chrono::steady_clock::time_point t_OPT = std::chrono::steady_clock::now();
+    double tOPT= std::chrono::duration_cast<std::chrono::duration<double> >(t_OPT - t2_T).count();
+    cout << "time for PyrPoseOptim: " << tOPT << endl;
     // 4. optimized parameters update
     // 4.1) F pose
     Mat44 Tcw = Tool.Pose2Mat44(pose);
@@ -2372,6 +2375,7 @@ void optimizer::UpdateTrackedTextPOSE(vector<TextObservation*> &TextObjs, const 
         }
 
         // for frame text detection
+        //将当前帧中检测到的文本与文本对象关联（即已3d参数化的）
         F.vTextDeteCorMap[i0] = TextObjs[IdxTextLabel]->obj->mnId;
 
     }
